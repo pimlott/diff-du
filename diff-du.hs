@@ -71,17 +71,33 @@ addDu (du1@(Du p1 s1 cs1) : dus1) (du2@(Du p2 s2 cs2) : dus2) =
     GT -> du2 : addDu (du1 : dus1) dus2
     EQ -> Du p1 (s1 + s2) (addDu cs1 cs2) : addDu dus1 dus2
 
-pruneDu :: Int -> [Du] -> [Du]
-pruneDu t = snd . pruneDu' where
-  pruneDu' :: [Du] -> (Int, [Du])
-  pruneDu' dus = foldr (\du (s, rs) -> let (s', rs') = pruneDu1 du
-                                       in  (s + s', rs ++ rs'))
-                       (0, []) dus
-  pruneDu1 :: Du -> (Int, [Du])
-  pruneDu1 (Du p s cs) = let (rptSize, r) = pruneDu' cs
-                             s' = s - rptSize
-                         in  if abs s' >= t then (s, [Du p s' r])
-                                            else (rptSize, r)
+threshDu :: Thresher -> [Du] -> [Du]
+threshDu t = snd . threshDu' where
+  threshDu' :: [Du] -> (Maybe Int, [Du])
+  threshDu' dus = foldr (\du (s, rs) -> let (s', rs') = threshDu1 du
+                                        in  (s `addMaybe` s', rs ++ rs'))
+                        (Nothing, []) dus
+  threshDu1 :: Du -> (Maybe Int, [Du])
+  threshDu1 (Du p s cs) = let (rptSize, r) = threshDu' cs
+                          in  case t s rptSize of
+                                Just s' -> (Just s, [Du p s' r])
+                                Nothing -> (rptSize, r)
+
+addMaybe :: Maybe Int -> Maybe Int -> Maybe Int
+addMaybe (Just x) (Just y) = Just (x+y)
+addMaybe (Just x) Nothing  = Just x
+addMaybe Nothing  (Just y) = Just y
+addMaybe Nothing  Nothing  = Nothing
+
+-- size -> reported size of children -> report as size
+type Thresher = Int -> Maybe Int -> Maybe Int
+simpleThresher, smartThresher, deepestThresher :: Int -> Thresher
+simpleThresher t s _ = if abs s >= t then Just s else Nothing
+smartThresher t s (Just rptSize) = let s' = s - rptSize
+                                   in  if abs s' >= t then Just s' else Nothing
+smartThresher t s Nothing        = if abs s >= t then Just s else Nothing
+deepestThresher _ _ (Just _) = Nothing
+deepestThresher t s Nothing = if abs s >= t then Just s else Nothing
 
 main = do
   [t, f1, f2] <- getArgs
@@ -89,5 +105,5 @@ main = do
   let du1 = readDu s1
   s2 <- readFile f2
   let du2 = readDu s2
-  let r = pruneDu (read t) (du2 `addDu` negateDu du1)
+  let r = threshDu (smartThresher (read t)) (du2 `addDu` negateDu du1)
   putStr (showDu (sortDuOnMaxSize r))
