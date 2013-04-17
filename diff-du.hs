@@ -2,6 +2,7 @@ import Data.Char (isDigit)
 import Data.List
 import System.Environment
 import Text.ParserCombinators.ReadP
+import Text.Printf (printf)
 
 data Du = Du { path :: String, size :: Int, children :: [Du]}
   deriving (Show, Eq)
@@ -34,11 +35,11 @@ isUnder "/" ('/' : _) = True
 isUnder (c1 : cs1) (c2 : cs2) = c1 == c2 && isUnder cs1 cs2
 isUnder _ _ = False
 
--- todo printf %-8d, always put unary +/-
 showDu :: [Du] -> String
 showDu dus = unlines (showsDu' dus [])
 showsDu' :: [Du] -> ([String] -> [String])
-showsDu' = foldr (\(Du p s cs) -> ((showsDu' cs . (shows s (' ' : p) :)) .)) id
+showsDu' = foldr (\(Du p s cs) -> let l = printf "%+-8d " s ++ p
+                                  in  ((showsDu' cs . (l :)) .)) id
 
 negateDu :: [Du] -> [Du]
 negateDu = map (\(Du p s cs) -> Du p (-s) (negateDu cs))
