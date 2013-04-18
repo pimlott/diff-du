@@ -1,6 +1,10 @@
 import Data.Char (isDigit)
 import Data.List
+import System.Directory
 import System.Environment
+import System.Exit
+import System.IO
+import System.Process
 import Text.ParserCombinators.ReadP
 import Text.Printf (printf)
 
@@ -109,11 +113,30 @@ smartThresher t s Nothing        = if abs s >= t then Just s else Nothing
 deepestThresher _ _ (Just _) = Nothing
 deepestThresher t s Nothing = if abs s >= t then Just s else Nothing
 
+getDu :: String -> IO String
+getDu f = doesFileExist f >>= \b -> case b of
+  True  -> if ".gz" `isSuffixOf` f
+    then readProc "zcat" [f]
+    else readFile f
+  False -> doesDirectoryExist f >>= \b -> case b of
+    True  -> readProc "du" ["-k", "-a", f]
+    False -> do hPutStrLn stderr (printf "%s does not exist" f)
+                exitFailure
+
+readProc :: String -> [String] -> IO String
+readProc cmd args = do
+  (r, out, err) <- readProcessWithExitCode cmd args ""
+  hPutStr stderr err
+  case r of
+    ExitSuccess   -> return out
+    ExitFailure r -> do hPutStrLn stderr (printf "%s: exit %d " cmd r)
+                        exitWith (ExitFailure r)
+
 main = do
   [t, f1, f2] <- getArgs
-  s1 <- readFile f1
+  s1 <- getDu f1
   let du1 = readDu s1
-  s2 <- readFile f2
+  s2 <- getDu f2
   let du2 = readDu s2
   let r = threshDu (smartThresher (read t)) (du2 `addDu` negateDu du1)
   putStr (showDuHead f1 f2 (sortDuOnMaxSize r))
