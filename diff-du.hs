@@ -1,5 +1,6 @@
 import Data.Char (isDigit)
 import Data.List
+import System.Console.GetOpt
 import System.Directory
 import System.Environment
 import System.Exit
@@ -132,11 +133,40 @@ readProc cmd args = do
     ExitFailure r -> do hPutStrLn stderr (printf "%s: exit %d " cmd r)
                         exitWith (ExitFailure r)
 
+data Opts = Opts { optHelp :: Bool, optThreshold :: String } deriving Show
+defaultOpts = Opts { optHelp = False, optThreshold = "1" }
+
+opts :: [OptDescr (Opts -> Opts)]
+opts = [
+    Option ['h'] ["help"] (NoArg (\o -> o { optHelp = True })) "print this message",
+    Option ['t'] ["threshold"] (ReqArg (\t o -> o { optThreshold = t }) "n") "ignore differences under this threshold"
+  ]
+
+usage = usageInfo (
+    "Usage: diff-du [--threshold <n>] <p> <p>\n" ++
+    "where <p> is either\n" ++
+    "- a directories to run du on OR\n" ++
+    "- a file (possibly gzipped) containing du output"
+  ) opts
+
+getOpts :: ArgOrder (Opts -> Opts) -> [OptDescr (Opts -> Opts)] -> [String] ->
+           (Opts, [String], [String])
+getOpts argOrder opts args = let (os, args', errs) = getOpt argOrder opts args
+                                 os' = foldr id defaultOpts os
+                             in  (os', args', errs)
+
 main = do
-  [t, f1, f2] <- getArgs
-  s1 <- getDu f1
-  let du1 = readDu s1
-  s2 <- getDu f2
-  let du2 = readDu s2
-  let r = threshDu (smartThresher (read t)) (du2 `addDu` negateDu du1)
-  putStr (showDuHead f1 f2 (sortDuOnMaxSize r))
+  args <- getArgs
+  case getOpts RequireOrder opts args of
+    (Opts { optHelp = True }, _, []) -> do putStr usage
+                                           exitSuccess
+    (Opts { optThreshold = t }, [f1, f2], []) -> do
+      let t' = read t
+      s1 <- getDu f1
+      let du1 = readDu s1
+      s2 <- getDu f2
+      let du2 = readDu s2
+      let r = threshDu (smartThresher t') (du2 `addDu` negateDu du1)
+      putStr (showDuHead f1 f2 (sortDuOnMaxSize r))
+    (_, _, errs) -> do hPutStr stderr (concat errs ++ usage)
+                       exitFailure
