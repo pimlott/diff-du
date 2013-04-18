@@ -8,13 +8,14 @@ data Du = Du { path :: String, size :: Int, children :: [Du]}
   deriving (Show, Eq)
 
 readDu :: String -> [Du]
-readDu ls = let (r, []) = readDuLinesUnder "" (sort (map readDuLine (lines ls)))
-            in  r
+readDu s = let ls = sort (map readDuLine (lines s))
+               (r, []) = readDuLinesUnder Nothing ls
+           in  r
 
-readDuLinesUnder :: String -> [(String, Int)] -> ([Du], [(String, Int)])
+readDuLinesUnder :: Maybe String -> [(String, Int)] -> ([Du], [(String, Int)])
 readDuLinesUnder base [] = ([], [])
 readDuLinesUnder base ((p, s) : ls) | isUnder base p =
-  let (cs, ls') = readDuLinesUnder p ls
+  let (cs, ls') = readDuLinesUnder (Just p) ls
       (dus, ls'') = readDuLinesUnder base ls'
   in  (Du p s cs : dus, ls'')
 readDuLinesUnder base ls = ([], ls)
@@ -29,11 +30,13 @@ readPDuLine = do
   skipSpaces
   return s
 
-isUnder :: String -> String -> Bool
-isUnder ""  ('/' : _) = True
-isUnder "/" ('/' : _) = True
-isUnder (c1 : cs1) (c2 : cs2) = c1 == c2 && isUnder cs1 cs2
-isUnder _ _ = False
+isUnder :: Maybe String -> String -> Bool
+isUnder Nothing _ = True
+isUnder (Just base) s = isUnder' base s where
+  isUnder' ""  ('/' : _) = True
+  isUnder' "/" ('/' : _) = True
+  isUnder' (c1 : cs1) (c2 : cs2) = c1 == c2 && isUnder' cs1 cs2
+  isUnder' _ _ = False
 
 
 showDuHead :: String -> String -> [Du] -> String
