@@ -73,15 +73,15 @@ addDu (du1@(Du p1 s1 cs1) : dus1) (du2@(Du p2 s2 cs2) : dus2) =
     EQ -> Du p1 (s1 + s2) (addDu cs1 cs2) : addDu dus1 dus2
 
 threshDu :: Thresher -> [Du] -> [Du]
-threshDu t = snd . threshDu' where
-  threshDu' :: [Du] -> (Maybe Int, [Du])
+threshDu t dus = snd (threshDu' dus) [] where
+  threshDu' :: [Du] -> (Maybe Int, [Du] -> [Du])
   threshDu' dus = foldr (\du (s, rs) -> let (s', rs') = threshDu1 du
-                                        in  (s `addMaybe` s', rs ++ rs'))
-                        (Nothing, []) dus
-  threshDu1 :: Du -> (Maybe Int, [Du])
+                                        in  (s `addMaybe` s', rs . rs'))
+                        (Nothing, id) dus
+  threshDu1 :: Du -> (Maybe Int, [Du] -> [Du])
   threshDu1 (Du p s cs) = let (rptSize, r) = threshDu' cs
                           in  case t s rptSize of
-                                Just s' -> (Just s, [Du p s' r])
+                                Just s' -> (Just s, (Du p s' (r []) :))
                                 Nothing -> (rptSize, r)
 
 addMaybe :: Maybe Int -> Maybe Int -> Maybe Int
