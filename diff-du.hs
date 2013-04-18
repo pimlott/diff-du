@@ -35,6 +35,11 @@ isUnder "/" ('/' : _) = True
 isUnder (c1 : cs1) (c2 : cs2) = c1 == c2 && isUnder cs1 cs2
 isUnder _ _ = False
 
+
+showDuHead :: String -> String -> [Du] -> String
+showDuHead f1 f2 dus = case showsDu' dus [] of
+  [] -> ""
+  ls -> unlines (("--- " ++ f1) : ("+++ " ++ f2) : ls)
 showDu :: [Du] -> String
 showDu dus = unlines (showsDu' dus [])
 showsDu' :: [Du] -> ([String] -> [String])
@@ -108,4 +113,4 @@ main = do
   s2 <- readFile f2
   let du2 = readDu s2
   let r = threshDu (smartThresher (read t)) (du2 `addDu` negateDu du1)
-  putStr (showDu (sortDuOnMaxSize r))
+  putStr (showDuHead f1 f2 (sortDuOnMaxSize r))
