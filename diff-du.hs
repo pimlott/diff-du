@@ -161,7 +161,11 @@ main = do
     (Opts { optHelp = True }, _, []) -> do putStr usage
                                            exitSuccess
     (Opts { optThreshold = t }, [f1, f2], []) -> do
-      let t' = read t
+      t' <- case reads t of
+        [(t', "")] -> return t'
+        _          -> do hPutStrLn stderr
+                           (printf "threshold %s not an int\n" t ++ usage)
+                         exitFailure
       s1 <- getDu f1
       let du1 = readDu s1
       s2 <- getDu f2
