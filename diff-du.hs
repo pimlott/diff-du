@@ -38,8 +38,9 @@ isUnder _ _ = False
 showDu :: [Du] -> String
 showDu dus = unlines (showsDu' dus [])
 showsDu' :: [Du] -> ([String] -> [String])
-showsDu' = foldr (\(Du p s cs) -> let l = printf "%+-8d " s ++ p
-                                  in  ((showsDu' cs . (l :)) .)) id
+showsDu' = foldr (\du -> (showsDu1 du .)) id
+showsDu1 :: Du -> ([String] -> [String])
+showsDu1 (Du p s cs) = showsDu' cs . ((printf "%+-8d " s ++ p) :)
 
 negateDu :: [Du] -> [Du]
 negateDu = map (\(Du p s cs) -> Du p (-s) (negateDu cs))
