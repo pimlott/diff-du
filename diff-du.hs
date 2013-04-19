@@ -136,13 +136,13 @@ defaultOpts = Opts { optHelp = False, optThreshold = "1" }
 opts :: [OptDescr (Opts -> Opts)]
 opts = [
     Option ['h'] ["help"] (NoArg (\o -> o { optHelp = True })) "print this message",
-    Option ['t'] ["threshold"] (ReqArg (\t o -> o { optThreshold = t }) "n") "ignore differences under this threshold"
+    Option ['t'] ["threshold"] (ReqArg (\t o -> o { optThreshold = t }) "N") "ignore differences under this threshold"
   ]
 
 usage = usageInfo (
-    "Usage: diff-du [--threshold <n>] <p> <p>\n" ++
-    "where <p> is either\n" ++
-    "- a directories to run du on OR\n" ++
+    "Usage: diff-du [--threshold N] PATH PATH\n" ++
+    "where PATH is either\n" ++
+    "- a directory to run du on OR\n" ++
     "- a file (possibly gzipped) containing du output"
   ) opts
 
