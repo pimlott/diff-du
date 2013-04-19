@@ -15,7 +15,7 @@ data Du = Du { path :: String, size :: Int, children :: [Du]}
 readDu :: String -> [Du]
 readDu s = let ls = reverse (map readDuLine (lines s))
                (r, []) = readDuLinesUnder Nothing ls
-           in  sortDuOn path r
+           in  r
 
 readDuLinesUnder :: Maybe String -> [(String, Int)] -> ([Du], [(String, Int)])
 readDuLinesUnder base [] = ([], [])
@@ -164,9 +164,9 @@ main = do
                            (printf "threshold %s not an int\n" t ++ usage)
                          exitFailure
       s1 <- getDu f1
-      let du1 = readDu s1
+      let du1 = sortDuOn path (readDu s1)
       s2 <- getDu f2
-      let du2 = readDu s2
+      let du2 = sortDuOn path (readDu s2)
       let r = threshDu (smartThresher t') (diffDu du1 du2)
       putStr (showDuHead f1 f2 (sortDuOnMaxSize r))
     (_, _, errs) -> do hPutStr stderr (concat errs ++ usage)
