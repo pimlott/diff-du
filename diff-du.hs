@@ -13,9 +13,9 @@ data Du = Du { path :: String, size :: Int, children :: [Du]}
   deriving (Show, Eq)
 
 readDu :: String -> [Du]
-readDu s = let ls = sort (map readDuLine (lines s))
+readDu s = let ls = reverse (map readDuLine (lines s))
                (r, []) = readDuLinesUnder Nothing ls
-           in  r
+           in  sortDuOn path r
 
 readDuLinesUnder :: Maybe String -> [(String, Int)] -> ([Du], [(String, Int)])
 readDuLinesUnder base [] = ([], [])
