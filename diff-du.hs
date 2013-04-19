@@ -77,13 +77,13 @@ sortDuOnMaxSize = map snd . sort' where
 
 -- inputs must be sorted on path
 addDu :: [Du] -> [Du] -> [Du]
-addDu []   [] = []
-addDu []   dus2 = dus2
-addDu dus1 [] = dus1
+addDu [] [] = []
+addDu [] (Du p2 s2 cs2 : dus2) = Du p2 s2 [] : addDu [] dus2
+addDu (Du p1 s1 cs1 : dus1) [] = Du p1 s1 [] : addDu dus1 []
 addDu (du1@(Du p1 s1 cs1) : dus1) (du2@(Du p2 s2 cs2) : dus2) =
   case p1 `compare` p2 of
-    LT -> du1 : addDu dus1 (du2 : dus2)
-    GT -> du2 : addDu (du1 : dus1) dus2
+    LT -> Du p1 s1 [] : addDu dus1 (du2 : dus2)
+    GT -> Du p2 s2 [] : addDu (du1 : dus1) dus2
     EQ -> Du p1 (s1 + s2) (addDu cs1 cs2) : addDu dus1 dus2
 
 threshDu :: Thresher -> [Du] -> [Du]
