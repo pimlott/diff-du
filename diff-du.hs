@@ -55,9 +55,6 @@ showsDu' = foldr (\du -> (showsDu1 du .)) id
 showsDu1 :: Du -> ([String] -> [String])
 showsDu1 (Du p s cs) = showsDu' cs . ((printf "%+-8d " s ++ p) :)
 
-negateDu :: [Du] -> [Du]
-negateDu = map (\(Du p s cs) -> Du p (-s) (negateDu cs))
-
 sortOn, sortOnRev :: Ord b => (a -> b) -> [a] -> [a]
 sortOn f = sortBy (\a1 a2 -> f a1 `compare` f a2)
 sortOnRev f = sortBy (\a1 a2 -> f a2 `compare` f a1)
@@ -76,15 +73,15 @@ sortDuOnMaxSize = map snd . sort' where
                       in  (maxS, Du p s (map snd r))
 
 -- inputs must be sorted on path
-addDu :: [Du] -> [Du] -> [Du]
-addDu [] [] = []
-addDu [] (Du p2 s2 cs2 : dus2) = Du p2 s2 [] : addDu [] dus2
-addDu (Du p1 s1 cs1 : dus1) [] = Du p1 s1 [] : addDu dus1 []
-addDu (du1@(Du p1 s1 cs1) : dus1) (du2@(Du p2 s2 cs2) : dus2) =
+diffDu :: [Du] -> [Du] -> [Du]
+diffDu [] [] = []
+diffDu (Du p1 s1 cs1 : dus1) [] = Du p1 (-s1) [] : diffDu dus1 []
+diffDu [] (Du p2 s2 cs2 : dus2) = Du p2   s2  [] : diffDu [] dus2
+diffDu (du1@(Du p1 s1 cs1) : dus1) (du2@(Du p2 s2 cs2) : dus2) =
   case p1 `compare` p2 of
-    LT -> Du p1 s1 [] : addDu dus1 (du2 : dus2)
-    GT -> Du p2 s2 [] : addDu (du1 : dus1) dus2
-    EQ -> Du p1 (s1 + s2) (addDu cs1 cs2) : addDu dus1 dus2
+    LT -> Du p1 (-s1) [] : diffDu dus1 (du2 : dus2)
+    GT -> Du p2   s2  [] : diffDu (du1 : dus1) dus2
+    EQ -> Du p1 (s2-s1) (diffDu cs1 cs2) : diffDu dus1 dus2
 
 threshDu :: Thresher -> [Du] -> [Du]
 threshDu t dus = snd (threshDu' dus) [] where
@@ -170,7 +167,7 @@ main = do
       let du1 = readDu s1
       s2 <- getDu f2
       let du2 = readDu s2
-      let r = threshDu (smartThresher t') (du2 `addDu` negateDu du1)
+      let r = threshDu (smartThresher t') (diffDu du1 du2)
       putStr (showDuHead f1 f2 (sortDuOnMaxSize r))
     (_, _, errs) -> do hPutStr stderr (concat errs ++ usage)
                        exitFailure
