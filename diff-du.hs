@@ -111,14 +111,14 @@ smartThresher t s Nothing        = if abs s >= t then Just s else Nothing
 deepestThresher _ _ (Just _) = Nothing
 deepestThresher t s Nothing = if abs s >= t then Just s else Nothing
 
-getDu :: String -> IO String
-getDu Opts f =
+getDu :: Opts -> String -> IO String
+getDu Opts { optDuProg = du, optDuArgs = as } f =
   doesFileExist f >>= \b -> if b then
     if ".gz" `isSuffixOf` f
       then readProc "zcat" [f]
       else readFile f
   else doesDirectoryExist f >>= \b -> if b then
-    readProc "du" ["-k", "-a", f]
+    readProc du (as ++ [f])
   else do hPutStrLn stderr (printf "%s does not exist" f)
           exitFailure
 
@@ -131,13 +131,29 @@ readProc cmd args = do
     ExitFailure r -> do hPutStrLn stderr (printf "%s: exit %d " cmd r)
                         exitWith (ExitFailure r)
 
-data Opts = Opts { optHelp :: Bool, optThreshold :: String } deriving Show
-defaultOpts = Opts { optHelp = False, optThreshold = "1" }
+data Opts = Opts {
+  optHelp :: Bool,
+  optThreshold :: String,
+  optDuProg :: String,
+  optDuArgs :: [String]
+} deriving Show
+defaultOpts = Opts {
+  optHelp = False,
+  optThreshold = "1",
+  optDuProg = "du",
+  optDuArgs = []
+}
+setOptHelp o = o { optHelp = True }
+setOptThreshold t o = o { optThreshold = t }
+setOptDuProg p o = o { optDuProg = p }
+addOptDuArg a o@Opts { optDuArgs = as } = o { optDuArgs = a : as }
 
 opts :: [OptDescr (Opts -> Opts)]
 opts = [
-    Option ['h'] ["help"] (NoArg (\o -> o { optHelp = True })) "print this message",
-    Option ['t'] ["threshold"] (ReqArg (\t o -> o { optThreshold = t }) "N") "ignore differences under this threshold"
+    Option ['h'] ["help"] (NoArg setOptHelp) "print this message",
+    Option ['t'] ["threshold"] (ReqArg setOptThreshold "N") "ignore differences under this threshold",
+    Option [] ["du-prog"] (ReqArg setOptDuProg "PROG") "use PROG as du",
+    Option [] ["du-arg"] (ReqArg addOptDuArg "ARG") "pass ARG on to du"
   ]
 
 usage = usageInfo (
@@ -158,15 +174,15 @@ main = do
   case getOpts RequireOrder opts args of
     (Opts { optHelp = True }, _, []) -> do putStr usage
                                            exitSuccess
-    (Opts { optThreshold = t }, [f1, f2], []) -> do
+    (o@Opts { optThreshold = t }, [f1, f2], []) -> do
       t' <- case reads t of
         [(t', "")] -> return t'
         _          -> do hPutStrLn stderr
                            (printf "threshold %s not an int\n" t ++ usage)
                          exitFailure
-      s1 <- getDu f1
+      s1 <- getDu o f1
       let du1 = sortDuOn path (readDu s1)
-      s2 <- getDu f2
+      s2 <- getDu o f2
       let du2 = sortDuOn path (readDu s2)
       let r = threshDu (smartThresher t') (diffDu du1 du2)
       putStr (showDuHead f1 f2 (sortDuOnMaxSize r))
