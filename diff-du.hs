@@ -14,20 +14,20 @@ data Du = Du { path :: String, size :: Int, children :: [Du]}
 
 readDu :: String -> [Du]
 readDu s = let ls = reverse (map readDuLine (lines s))
-               (r, []) = readDuLinesUnder Nothing ls
+               (r, []) = unflattenDuUnder Nothing ls
            in  r
 
-readDuLinesUnder :: Maybe String -> [(String, Int)] -> ([Du], [(String, Int)])
-readDuLinesUnder base [] = ([], [])
-readDuLinesUnder base ((p, s) : ls) | isUnder base p =
-  let (cs, ls') = readDuLinesUnder (Just p) ls
-      (dus, ls'') = readDuLinesUnder base ls'
+unflattenDuUnder :: Maybe String -> [Du] -> ([Du], [Du])
+unflattenDuUnder base [] = ([], [])
+unflattenDuUnder base (Du p s [] : ls) | isUnder base p =
+  let (cs, ls') = unflattenDuUnder (Just p) ls
+      (dus, ls'') = unflattenDuUnder base ls'
   in  (Du p s cs : dus, ls'')
-readDuLinesUnder base ls = ([], ls)
+unflattenDuUnder base ls = ([], ls)
 
-readDuLine :: String -> (String, Int)
+readDuLine :: String -> Du
 readDuLine l = let [(s, p)] = readP_to_S readPDuLine l
-               in  (p, read s)
+               in  Du p (read s) []
 
 readPDuLine :: ReadP String
 readPDuLine = do
