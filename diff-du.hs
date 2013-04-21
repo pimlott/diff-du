@@ -157,14 +157,14 @@ addOptDuArg a o@Opts { optDuArgs = as } = o { optDuArgs = a : as }
 opts :: [OptDescr (Opts -> Opts)]
 opts = [
     Option ['h'] ["help"] (NoArg setOptHelp) "print this message",
-    Option ['t'] ["threshold"] (ReqArg setOptThreshold "N") "ignore differences under this threshold",
+    Option ['t'] ["threshold"] (ReqArg setOptThreshold "N") "ignore differences below this threshold",
     Option [] ["du-prog"] (ReqArg setOptDuProg "PROG") "use PROG as du",
     Option [] ["du-arg"] (ReqArg addOptDuArg "ARG") "pass ARG on to du"
   ]
 
 usage = usageInfo (
     "Usage: diff-du [--threshold N] PATH PATH\n" ++
-    "where PATH is either\n" ++
+    "PATH is either\n" ++
     "- a directory to run du on OR\n" ++
     "- a file (possibly gzipped) containing du output"
   ) opts
