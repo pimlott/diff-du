@@ -43,6 +43,12 @@ isUnder (Just base) s = isUnder' base s where
   isUnder' (c1 : cs1) (c2 : cs2) = c1 == c2 && isUnder' cs1 cs2
   isUnder' _ _ = False
 
+flattenDu :: [Du] -> [Du]
+flattenDu dus = flattenDu' dus [] where
+  flattenDu' :: [Du] -> ([Du] -> [Du])
+  flattenDu' = foldr (\du -> (flattenDu1 du .)) id
+  flattenDu1 :: Du -> ([Du] -> [Du])
+  flattenDu1 (Du p s cs) = (Du p s [] :) . flattenDu' cs
 
 showDuHead :: String -> String -> [Du] -> String
 showDuHead f1 f2 dus = case showsDu' dus [] of
@@ -185,6 +191,6 @@ main = do
       s2 <- getDu o f2
       let du2 = sortDuOn path (readDu s2)
       let r = threshDu (smartThresher t') (diffDu du1 du2)
-      putStr (showDuHead f1 f2 (sortDuOnMaxSize r))
+      putStr (showDuHead f1 f2 (sortDuOnMaxSize (flattenDu r)))
     (_, _, errs) -> do hPutStr stderr (concat errs ++ usage)
                        exitFailure
