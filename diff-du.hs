@@ -112,14 +112,15 @@ deepestThresher _ _ (Just _) = Nothing
 deepestThresher t s Nothing = if abs s >= t then Just s else Nothing
 
 getDu :: String -> IO String
-getDu f = doesFileExist f >>= \b -> case b of
-  True  -> if ".gz" `isSuffixOf` f
-    then readProc "zcat" [f]
-    else readFile f
-  False -> doesDirectoryExist f >>= \b -> case b of
-    True  -> readProc "du" ["-k", "-a", f]
-    False -> do hPutStrLn stderr (printf "%s does not exist" f)
-                exitFailure
+getDu Opts f =
+  doesFileExist f >>= \b -> if b then
+    if ".gz" `isSuffixOf` f
+      then readProc "zcat" [f]
+      else readFile f
+  else doesDirectoryExist f >>= \b -> if b then
+    readProc "du" ["-k", "-a", f]
+  else do hPutStrLn stderr (printf "%s does not exist" f)
+          exitFailure
 
 readProc :: String -> [String] -> IO String
 readProc cmd args = do
