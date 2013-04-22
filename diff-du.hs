@@ -9,14 +9,21 @@ import System.Process
 import Text.ParserCombinators.ReadP
 import Text.Printf (printf)
 
+-- The basic data structure.  Most of the time, we will use [Du], because
+-- a single du run may have multiple roots.
 data Du = Du { path :: String, size :: Int, children :: [Du]}
   deriving (Show, Eq)
 
+-- Parse du output.
 readDu :: String -> [Du]
 readDu s = let ls = reverse (map readDuLine (lines s))
                (r, []) = unflattenDuUnder Nothing ls
            in  r
 
+-- Helper for readDu.  Build a hierarchical [Du] out of a flat [Du], reading
+-- all entries under base.  Input must be ordered hierarchically with
+-- parents before children; basically, the reverse of du output.  Returns
+-- the hierarchical [Du] and the remaining input.
 unflattenDuUnder :: Maybe String -> [Du] -> ([Du], [Du])
 unflattenDuUnder base [] = ([], [])
 unflattenDuUnder base (Du p s [] : ls) | isUnder base p =
@@ -43,6 +50,7 @@ isUnder (Just base) s = isUnder' base s where
   isUnder' (c1 : cs1) (c2 : cs2) = c1 == c2 && isUnder' cs1 cs2
   isUnder' _ _ = False
 
+-- Turn a hierarchical [Du] into a flat [Du].
 flattenDu :: [Du] -> [Du]
 flattenDu dus = flattenDu' dus [] where
   flattenDu' :: [Du] -> ([Du] -> [Du])
@@ -50,8 +58,9 @@ flattenDu dus = flattenDu' dus [] where
   flattenDu1 :: Du -> ([Du] -> [Du])
   flattenDu1 (Du p s cs) = (Du p s [] :) . flattenDu' cs
 
-showDuHead :: String -> String -> [Du] -> String
-showDuHead f1 f2 dus = case showsDu' dus [] of
+-- Show [Du] in unified diff format.
+showDuDiff :: String -> String -> [Du] -> String
+showDuDiff f1 f2 dus = case showsDu' dus [] of
   [] -> ""
   ls -> unlines (("--- " ++ f1) : ("+++ " ++ f2) : ls)
 showDu :: [Du] -> String
@@ -68,6 +77,8 @@ sortOnRev f = sortBy (\a1 a2 -> f a2 `compare` f a1)
 sortDuOn :: Ord a => (Du -> a) -> [Du] -> [Du]
 sortDuOn f = sortOn f . map (\(Du p s cs) -> Du p s (sortDuOn f cs))
 
+-- Sort [Du] with largest diffs first, where the size of a diff is the
+-- maximum diff of it or its children.
 sortDuOnMaxSize :: [Du] -> [Du]
 sortDuOnMaxSize = map snd . sort' where
   sort' :: [Du] -> [(Int, Du)]
@@ -78,7 +89,9 @@ sortDuOnMaxSize = map snd . sort' where
                                            ((s', _) : _) -> max s s'
                       in  (maxS, Du p s (map snd r))
 
--- inputs must be sorted on path
+-- Find the diff between to [Du]s (positive if the second input is larger,
+-- negative if the first).  Ignores children of entries only in one input.
+-- Inputs must be sorted on path.
 diffDu :: [Du] -> [Du] -> [Du]
 diffDu [] [] = []
 diffDu (Du p1 s1 cs1 : dus1) [] = Du p1 (-s1) [] : diffDu dus1 []
@@ -89,8 +102,14 @@ diffDu (du1@(Du p1 s1 cs1) : dus1) (du2@(Du p2 s2 cs2) : dus2) =
     GT -> Du p2   s2  [] : diffDu (du1 : dus1) dus2
     EQ -> Du p1 (s2-s1) (diffDu cs1 cs2) : diffDu dus1 dus2
 
+-- Removes entries under a threshold.  The Thresher is applied to the size
+-- of the entry and the total size of children accepted by the Thresher
+-- (Nothing if none accepted), and returns the reported size of the entry
+-- (if accepted) or Nothing (to remove).
 threshDu :: Thresher -> [Du] -> [Du]
 threshDu t dus = snd (threshDu' dus) [] where
+  -- Returns the total size accepted and the accepted [Du] (in "difference
+  -- list" form)
   threshDu' :: [Du] -> (Maybe Int, [Du] -> [Du])
   threshDu' dus = foldr (\du (s, rs) -> let (s', rs') = threshDu1 du
                                         in  (s `addMaybe` s', rs . rs'))
@@ -107,16 +126,21 @@ addMaybe (Just x) Nothing  = Just x
 addMaybe Nothing  (Just y) = Just y
 addMaybe Nothing  Nothing  = Nothing
 
--- size -> reported size of children -> report as size
+-- size -> accepted size of children -> report as size
 type Thresher = Int -> Maybe Int -> Maybe Int
 simpleThresher, smartThresher, deepestThresher :: Int -> Thresher
+-- Report all entries above threshold as their actual size.
 simpleThresher t s _ = if abs s >= t then Just s else Nothing
+-- Exclude size of accepted children.
 smartThresher t s (Just rptSize) = let s' = s - rptSize
                                    in  if abs s' >= t then Just s' else Nothing
 smartThresher t s Nothing        = if abs s >= t then Just s else Nothing
+-- Do not report parents of accepted children.
 deepestThresher _ _ (Just _) = Nothing
 deepestThresher t s Nothing = if abs s >= t then Just s else Nothing
 
+-- Get raw du output from a file (possibly gzipped) or by running du on a
+-- directory.
 getDu :: Opts -> String -> IO String
 getDu Opts { optDuProg = du, optDuArgs = as } f =
   doesFileExist f >>= \b -> if b then
@@ -128,6 +152,7 @@ getDu Opts { optDuProg = du, optDuArgs = as } f =
   else do hPutStrLn stderr (printf "%s does not exist" f)
           exitFailure
 
+-- Run a process, reading the output.
 readProc :: String -> [String] -> IO String
 readProc cmd args = do
   (r, out, err) <- readProcessWithExitCode cmd args ""
@@ -137,6 +162,7 @@ readProc cmd args = do
     ExitFailure r -> do hPutStrLn stderr (printf "%s: exit %d " cmd r)
                         exitWith (ExitFailure r)
 
+-- Command line options.
 data Opts = Opts {
   optHelp :: Bool,
   optThreshold :: String,
@@ -169,6 +195,7 @@ usage = usageInfo (
     "- a file (possibly gzipped) containing du output"
   ) opts
 
+-- Helper to apply the record transformations and return the final Opts.
 getOpts :: ArgOrder (Opts -> Opts) -> [OptDescr (Opts -> Opts)] -> [String] ->
            (Opts, [String], [String])
 getOpts argOrder opts args = let (os, args', errs) = getOpt argOrder opts args
@@ -191,6 +218,6 @@ main = do
       s2 <- getDu o f2
       let du2 = sortDuOn path (readDu s2)
       let r = threshDu (smartThresher t') (diffDu du1 du2)
-      putStr (showDuHead f1 f2 (sortDuOnMaxSize (flattenDu r)))
+      putStr (showDuDiff f1 f2 (sortDuOnMaxSize (flattenDu r)))
     (_, _, errs) -> do hPutStr stderr (concat errs ++ usage)
                        exitFailure
