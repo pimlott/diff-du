@@ -86,6 +86,7 @@ TODO
 ====
 
 I would love suggestions for making `diff-du` more useful and intuitive.
+You can report bugs and requests as GitHub issues, or send me email.
 
 Related Work
 ============
@@ -104,3 +105,8 @@ License
 
 `diff-du` is licensed under the three-clause BSD license.  See the `LICENSE`
 file.
+
+Author
+======
+
+Andrew Pimlott, andrew@pimlott.net
