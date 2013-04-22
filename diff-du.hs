@@ -21,9 +21,9 @@ readDu s = let ls = reverse (map readDuLine (lines s))
            in  r
 
 -- Helper for readDu.  Build a hierarchical [Du] out of a flat [Du], reading
--- all entries under base.  Input must be ordered hierarchically with
--- parents before children; basically, the reverse of du output.  Returns
--- the hierarchical [Du] and the remaining input.
+-- all entries with path under base.  Input must be ordered hierarchically
+-- with parents before children--basically, the reverse of du output.
+-- Returns the hierarchical [Du] and the remaining input.
 unflattenDuUnder :: Maybe String -> [Du] -> ([Du], [Du])
 unflattenDuUnder base [] = ([], [])
 unflattenDuUnder base (Du p s [] : ls) | isUnder base p =
@@ -77,8 +77,8 @@ sortOnRev f = sortBy (\a1 a2 -> f a2 `compare` f a1)
 sortDuOn :: Ord a => (Du -> a) -> [Du] -> [Du]
 sortDuOn f = sortOn f . map (\(Du p s cs) -> Du p s (sortDuOn f cs))
 
--- Sort [Du] with largest diffs first, where the size of a diff is the
--- maximum diff of it or its children.
+-- Sort [Du] largest first, using the maximum size of an entry and its
+-- children.
 sortDuOnMaxSize :: [Du] -> [Du]
 sortDuOnMaxSize = map snd . sort' where
   sort' :: [Du] -> [(Int, Du)]
@@ -90,7 +90,7 @@ sortDuOnMaxSize = map snd . sort' where
                       in  (maxS, Du p s (map snd r))
 
 -- Find the diff between to [Du]s (positive if the second input is larger,
--- negative if the first).  Ignores children of entries only in one input.
+-- negative if the first).  Ignores children of entries in only one input.
 -- Inputs must be sorted on path.
 diffDu :: [Du] -> [Du] -> [Du]
 diffDu [] [] = []
@@ -103,9 +103,9 @@ diffDu (du1@(Du p1 s1 cs1) : dus1) (du2@(Du p2 s2 cs2) : dus2) =
     EQ -> Du p1 (s2-s1) (diffDu cs1 cs2) : diffDu dus1 dus2
 
 -- Removes entries under a threshold.  The Thresher is applied to the size
--- of the entry and the total size of children accepted by the Thresher
--- (Nothing if none accepted), and returns the reported size of the entry
--- (if accepted) or Nothing (to remove).
+-- of the entry, and the total size of children accepted by the Thresher
+-- (Nothing if none); and returns the reported size of the entry (if
+-- accepted) or Nothing (to remove).
 threshDu :: Thresher -> [Du] -> [Du]
 threshDu t dus = snd (threshDu' dus) [] where
   -- Returns the total size accepted and the accepted [Du] (in "difference
