@@ -98,3 +98,9 @@ That's all I found.
 
 [stack]: http://stackoverflow.com/questions/1533593/is-there-a-standard-way-to-diff-du-outputs-to-detect-where-disk-space-usage-has
 [du-diff]: http://vicerveza.homeunix.net/~viric/soft/du-diff/
+
+License
+=======
+
+`diff-du` is licensed under the three-clause BSD license.  See the `LICENSE`
+file.
