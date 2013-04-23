@@ -83,13 +83,14 @@ sortDuOnMaxSize :: [Du] -> [Du]
 sortDuOnMaxSize = map snd . sort' where
   sort' :: [Du] -> [(Int, Du)]
   sort' = sortOnRev fst . map sort1
+  -- returns (the maximum size of the entry and its children, the entry sorted)
   sort1 :: Du -> (Int, Du)
   sort1 (Du p s cs) = let r = sort' cs
                           maxS = case r of [] -> s
                                            ((s', _) : _) -> max s s'
                       in  (maxS, Du p s (map snd r))
 
--- Find the diff between to [Du]s (positive if the second input is larger,
+-- Find the diff between two [Du]s (positive if the second input is larger,
 -- negative if the first).  Ignores children of entries in only one input.
 -- Inputs must be sorted on path.
 diffDu :: [Du] -> [Du] -> [Du]
@@ -103,13 +104,13 @@ diffDu (du1@(Du p1 s1 cs1) : dus1) (du2@(Du p2 s2 cs2) : dus2) =
     EQ -> Du p1 (s2-s1) (diffDu cs1 cs2) : diffDu dus1 dus2
 
 -- Removes entries under a threshold.  The Thresher is applied to the size
--- of the entry, and the total size of children accepted by the Thresher
+-- of the entry, and the total size of its children accepted by the Thresher
 -- (Nothing if none); and returns the reported size of the entry (if
 -- accepted) or Nothing (to remove).
 threshDu :: Thresher -> [Du] -> [Du]
 threshDu t dus = snd (threshDu' dus) [] where
   -- Returns the total size accepted and the accepted [Du] (in "difference
-  -- list" form)
+  -- list" [Du] -> [Du] form)
   threshDu' :: [Du] -> (Maybe Int, [Du] -> [Du])
   threshDu' dus = foldr (\du (s, rs) -> let (s', rs') = threshDu1 du
                                         in  (s `addMaybe` s', rs . rs'))
