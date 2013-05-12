@@ -1,4 +1,5 @@
 import Data.Char (isDigit)
+import Data.Either
 import Data.List
 import System.Console.GetOpt
 import System.Directory
@@ -166,22 +167,25 @@ readProc cmd args = do
 -- Command line options.
 data Opts = Opts {
   optHelp :: Bool,
-  optThreshold :: String,
+  optThreshold :: Int,
   optDuProg :: String,
   optDuArgs :: [String]
 } deriving Show
 defaultOpts = Opts {
   optHelp = False,
-  optThreshold = "1",
+  optThreshold = 1,
   optDuProg = "du",
   optDuArgs = []
 }
-setOptHelp o = o { optHelp = True }
-setOptThreshold t o = o { optThreshold = t }
-setOptDuProg p o = o { optDuProg = p }
-addOptDuArg a o@Opts { optDuArgs = as } = o { optDuArgs = a : as }
+type OptsTrans = Either (Opts -> Opts) String
+setOptHelp = Left (\o -> o { optHelp = True })
+setOptThreshold t = case reads t of
+  [(t', "")] -> Left (\q -> q { optThreshold = t' })
+  _          -> Right (printf "threshold %s not an int\n" t)
+setOptDuProg p = Left (\o -> o { optDuProg = p })
+addOptDuArg a = Left (\o@Opts { optDuArgs = as } -> o { optDuArgs = a : as })
 
-opts :: [OptDescr (Opts -> Opts)]
+opts :: [OptDescr OptsTrans]
 opts = [
     Option ['h'] ["help"] (NoArg setOptHelp) "print this message",
     Option ['t'] ["threshold"] (ReqArg setOptThreshold "N") "ignore differences below this threshold",
@@ -197,11 +201,14 @@ usage = usageInfo (
   ) opts
 
 -- Helper to apply the record transformations and return the final Opts.
-getOpts :: ArgOrder (Opts -> Opts) -> [OptDescr (Opts -> Opts)] -> [String] ->
+getOpts :: ArgOrder OptsTrans -> [OptDescr OptsTrans] -> [String] ->
            (Opts, [String], [String])
 getOpts argOrder opts args = let (os, args', errs) = getOpt argOrder opts args
-                                 os' = foldr id defaultOpts os
-                             in  (os', args', errs)
+                                 (os', errs') = foldr addOpt (defaultOpts, []) os
+                             in  (os', args', errs ++ errs') where
+  addOpt :: OptsTrans -> (Opts, [String]) -> (Opts, [String])
+  addOpt (Left f)    (os, errs) = (f os, errs)
+  addOpt (Right err) (os, errs) = (os, errs ++ [err])
 
 main = do
   args <- getArgs
@@ -209,16 +216,11 @@ main = do
     (Opts { optHelp = True }, _, []) -> do putStr usage
                                            exitSuccess
     (o@Opts { optThreshold = t }, [f1, f2], []) -> do
-      t' <- case reads t of
-        [(t', "")] -> return t'
-        _          -> do hPutStrLn stderr
-                           (printf "threshold %s not an int\n" t ++ usage)
-                         exitFailure
       s1 <- getDu o f1
       let du1 = sortDuOn path (readDu s1)
       s2 <- getDu o f2
       let du2 = sortDuOn path (readDu s2)
-      let r = threshDu (smartThresher t') (diffDu du1 du2)
+      let r = threshDu (smartThresher t) (diffDu du1 du2)
       putStr (showDuDiff f1 f2 (sortDuOnMaxSize (flattenDu r)))
     (_, _, errs) -> do hPutStr stderr (concat errs ++ usage)
                        exitFailure
