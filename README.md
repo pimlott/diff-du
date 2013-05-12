@@ -95,7 +95,7 @@ I was surprised that not much effort has gone into addressing this problem.
 There is a [Stack Overflow thread][stack] from 2009 asking about it, with
 only one little script offered as an answer (until I posted this).  Lluís
 Batlle i Rossell has written a simple version called [`du-diff`][du-diff].
-That's all I found.
+That's all I found (as of April, 2013).
 
 [stack]: http://stackoverflow.com/questions/1533593/is-there-a-standard-way-to-diff-du-outputs-to-detect-where-disk-space-usage-has
 [du-diff]: http://vicerveza.homeunix.net/~viric/soft/du-diff/
