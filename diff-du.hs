@@ -180,7 +180,7 @@ defaultOpts = Opts {
 type OptsTrans = Either (Opts -> Opts) String
 setOptHelp = Left (\o -> o { optHelp = True })
 setOptThreshold t = case reads t of
-  [(t', "")] -> Left (\q -> q { optThreshold = t' })
+  [(t', "")] -> Left (\o -> o { optThreshold = t' })
   _          -> Right (printf "threshold %s not an int\n" t)
 setOptDuProg p = Left (\o -> o { optDuProg = p })
 addOptDuArg a = Left (\o@Opts { optDuArgs = as } -> o { optDuArgs = a : as })
