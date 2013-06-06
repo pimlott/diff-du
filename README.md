@@ -1,14 +1,19 @@
-`diff-du` is a little tool for tracking down where your disk space is going
-by comparing two `du` runs.  Features:
+`diff-du` is a command line tool for tracking down where your disk space is
+going by comparing two `du` runs.  Features:
 
+- Output is sorted by diff size.  **Shows the worst offenders first.**
 - Takes an optional size threshold, below which diffs are not output.
-- Once a diff is output, it is not counted for its parents.  (See example.)
-- Children of new or removed directories are ignored.
-- Output is sorted by diff size.
+  **Only shows big differences.**
+- Once a diff is output, it is not counted for its parents.  **Shows the
+  real culprits.**  (See the example below.)
+- Children of new or removed directories are ignored.  **New and removed
+  directories are treated as a unit.**
 - Output is in unified diff format.  Programs that do syntax highlighting
-  should detect it automatically; try piping to `vi -`.
-- Accepts gzipped `du` output files.
-- Runs `du` for you if given a directory.
+  should detect it automatically; try piping to `vi -`.  **Familiar, pretty
+  output.**
+- Accepts gzipped `du` output files.  **Supports archived du reports.**
+- Runs `du` for you if given a directory.  **Compares live directories (or a
+  live directory with a saved report).**
 
 Here is an example (these files exist in the distribution):
 
