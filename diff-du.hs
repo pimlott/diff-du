@@ -105,6 +105,42 @@ sortDuOnMaxSize = map snd . sort' where
                                            ((s', _) : _) -> max s s'
                       in  (maxS, Du p s (map snd r))
 
+-- Remove a prefix, replacing it with "." (or do nothing for Nothing).  The
+-- Du must all be under this prefix.  Handles trailing '/'s in prefix.
+delPrefixDu :: Maybe String -> [Du] -> [Du]
+delPrefixDu prefix = map delDu where
+  delDu (Du p s cs) = Du (del p) s (map delDu cs)
+  del = delPrefix prefix
+
+delPrefix :: Maybe String -> String -> String
+delPrefix Nothing = id
+delPrefix (Just prefix) = del where
+  prefix' = reverse (dropWhile (== '/') (reverse prefix))
+  len = length prefix'
+  del s = '.' : '/' : dropWhile (== '/') (drop len s)
+
+-- Restore a prefix, replacing the leading "." added by delPrefix (or do
+-- nothing for Nothing), where positive diffs get prefix2 and negative diffs
+-- get prefix1.  The Du must all be under ".".
+addPrefixDu :: Maybe String -> Maybe String -> [Du] -> [Du]
+addPrefixDu prefix1 prefix2 = map addDu where
+  addDu (Du p s cs) = Du (if s>0 then add2 p else add1 p) s (map addDu cs)
+  add1 = addPrefix prefix1
+  add2 = addPrefix prefix2
+
+addPrefix :: Maybe String -> String -> String
+addPrefix Nothing = id
+-- "." -> "." if prefix didn't have trailing slash, "./" if it did.  This
+-- round-trips in a way consistent with GNU diff.
+addPrefix (Just prefix) = add where
+  rprefix = reverse prefix
+  trailingSlash = head rprefix == '/'
+  prefix' = reverse (dropWhile (== '/') rprefix)
+  dotPrefix = prefix' ++ if trailingSlash then "/" else ""
+  prependPrefix = (prefix' ++)
+  add "./" = dotPrefix
+  add ('.':s) = prependPrefix s
+
 -- Find the diff between two [Du]s (positive if the second input is larger,
 -- negative if the first).  Ignores children of entries in only one input.
 -- Inputs must be sorted on path.
@@ -230,10 +266,18 @@ main = do
                                            exitSuccess
     (o@Opts { optThreshold = t }, [f1, f2], []) -> do
       s1 <- getDu o f1
-      let du1 = sortDuOn path (readDu s1)
       s2 <- getDu o f2
-      let du2 = sortDuOn path (readDu s2)
-      let r = threshDu (smartThresher t) (diffDu du1 du2)
-      putStr (showDuDiff f1 f2 (sortDuOnMaxSize (flattenDu r)))
+      comparingDirs <- doesDirectoryExist f1 >>= \d1 ->
+                       doesDirectoryExist f2 >>= \d2 -> return (d1 && d2)
+      let (prefix1, prefix2) = if comparingDirs then (Just f1, Just f2)
+                                                else (Nothing, Nothing)
+      let du1 = sortDuOn path (delPrefixDu prefix1 (readDu s1))
+      let du2 = sortDuOn path (delPrefixDu prefix2 (readDu s2))
+      let r = sortDuOnMaxSize (
+               flattenDu (
+                addPrefixDu prefix1 prefix2 (
+                 threshDu (smartThresher t) (
+                  diffDu du1 du2))))
+      putStr (showDuDiff f1 f2 r)
     (_, _, errs) -> do hPutStr stderr (concat errs ++ usage)
                        exitFailure
