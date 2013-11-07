@@ -11,7 +11,8 @@ import Text.ParserCombinators.ReadP
 import Text.Printf (printf)
 
 -- The basic data structure.  Most of the time, we will use [Du], because
--- a single du run may have multiple roots.
+-- a single du run may have multiple roots.  Note that children still use
+-- their full path, not relative to the parent.
 data Du = Du { path :: String, size :: Int, children :: [Du]}
   deriving (Show, Eq)
 
@@ -22,9 +23,22 @@ readDu s = let ls = reverse (map readDuLine (lines s))
            in  r
 
 -- Helper for readDu.  Build a hierarchical [Du] out of a flat [Du], reading
--- all entries with path under base.  Input must be ordered hierarchically
--- with parents before children--basically, the reverse of du output.
--- Returns the hierarchical [Du] and the remaining input.
+-- all entries with path under base (all entries if base is Nothing).  Input
+-- must be ordered hierarchically with parents before children--basically,
+-- the reverse of du output.  Returns the hierarchical [Du] and the
+-- remaining input.  Example, if base is Just "a":
+--
+--  [ Du "a/b" _ [],
+--    Du "a/b/c" _ [],
+--    Du "a/c" _ [],
+--    Du "b" _ []
+--    Du "b/a" _ [] ]
+--  ---------->
+--  ( [ Du "b" _ [
+--        Du "c" _ [] ],
+--      Du "c" _ [] ] ],
+--    [ Du "b" _, []
+--      Du "b/a" _ [] ]
 unflattenDuUnder :: Maybe String -> [Du] -> ([Du], [Du])
 unflattenDuUnder base [] = ([], [])
 unflattenDuUnder base (Du p s [] : ls) | isUnder base p =
@@ -141,8 +155,7 @@ smartThresher t s Nothing        = if abs s >= t then Just s else Nothing
 deepestThresher _ _ (Just _) = Nothing
 deepestThresher t s Nothing = if abs s >= t then Just s else Nothing
 
--- Get raw du output from a file (possibly gzipped) or by running du on a
--- directory.
+-- Get raw du output from a file (possibly gzipped) or by running du.
 getDu :: Opts -> String -> IO String
 getDu Opts { optDuProg = du, optDuArgs = as } f =
   doesFileExist f >>= \b -> if b then
