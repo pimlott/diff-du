@@ -62,14 +62,25 @@ most useful for focusing on the real changes.
 Usage
 =====
 
-    Usage: diff-du [--threshold N] PATH PATH
+    Usage: diff-du [--threshold N] [--prune PATH]... PATH PATH
     PATH is either
     - a directory to run du on OR
     - a file (possibly gzipped) containing du output
-      -h    --help          print this message
-      -t N  --threshold=N   ignore differences below this threshold
-            --du-prog=PROG  use PROG as du
-            --du-arg=ARG    pass ARG on to du
+      -h       --help          print this message
+      -t N     --threshold=N   ignore differences below this threshold
+      -p NAME  --prune=NAME    ignore entries below directiory NAME (eg. .git)
+               --du-prog=PROG  use PROG as du
+               --du-arg=ARG    pass ARG on to du
+
+Cookbook
+========
+
+Sometimes you may want to ignore diffs under certain directories.  For
+example, the objects in a `.git` directory are low-level details, and you
+probably only care about the size of the whole thing.  This is what the
+`--prune` option is for.  If you add `--prune .git` to your command line,
+`diff-du` treats `.git` directories as a unit.  Their contents count
+towards the size of `.git`, but are never displayed.
 
 Building
 ========

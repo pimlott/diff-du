@@ -148,6 +148,12 @@ addPrefix (Just prefix) = add where
   add "./" = dotPrefix
   add ('.':s) = prependPrefix s
 
+-- Prune a du, removing entries in prunes.
+pruneDu :: [String] -> [Du] -> [Du]
+pruneDu prunes = map pruneDu' where
+  pruneDu' (Du p s cs) | p `elem` prunes = Du p s []
+  pruneDu' (Du p s cs) = Du p s (map pruneDu' cs)
+
 -- Find the diff between two [Du]s (positive if the second input is larger,
 -- negative if the first).  Ignores children of entries in only one input.
 -- Inputs must be sorted on path.
@@ -223,12 +229,14 @@ readProc cmd args = do
 data Opts = Opts {
   optHelp :: Bool,
   optThreshold :: Int,
+  optPrune :: [String],
   optDuProg :: String,
   optDuArgs :: [String]
 } deriving Show
 defaultOpts = Opts {
   optHelp = False,
   optThreshold = 1,
+  optPrune = [],
   optDuProg = "du",
   optDuArgs = []
 }
@@ -237,6 +245,7 @@ setOptHelp = Left (\o -> o { optHelp = True })
 setOptThreshold t = case reads t of
   [(t', "")] -> Left (\o -> o { optThreshold = t' })
   _          -> Right (printf "threshold %s not an int\n" t)
+addOptPrune p = Left (\o@Opts { optPrune = ps } -> o { optPrune = p : ps })
 setOptDuProg p = Left (\o -> o { optDuProg = p })
 addOptDuArg a = Left (\o@Opts { optDuArgs = as } -> o { optDuArgs = a : as })
 
@@ -244,12 +253,13 @@ opts :: [OptDescr OptsTrans]
 opts = [
     Option ['h'] ["help"] (NoArg setOptHelp) "print this message",
     Option ['t'] ["threshold"] (ReqArg setOptThreshold "N") "ignore differences below this threshold",
+    Option ['p'] ["prune"] (ReqArg addOptPrune "NAME") "ignore entries below directiory NAME (eg. .git)",
     Option [] ["du-prog"] (ReqArg setOptDuProg "PROG") "use PROG as du",
     Option [] ["du-arg"] (ReqArg addOptDuArg "ARG") "pass ARG on to du"
   ]
 
 usage = usageInfo (
-    "Usage: diff-du [--threshold N] PATH PATH\n" ++
+    "Usage: diff-du [--threshold N] [--prune PATH]... PATH PATH\n" ++
     "PATH is either\n" ++
     "- a directory to run du on OR\n" ++
     "- a file (possibly gzipped) containing du output"
@@ -270,15 +280,15 @@ main = do
   case getOpts RequireOrder opts args of
     (Opts { optHelp = True }, _, []) -> do putStr usage
                                            exitSuccess
-    (o@Opts { optThreshold = t }, [f1, f2], []) -> do
+    (o@Opts { optThreshold = t, optPrune = prunes }, [f1, f2], []) -> do
       s1 <- getDu o f1
       s2 <- getDu o f2
       comparingDirs <- doesDirectoryExist f1 >>= \d1 ->
                        doesDirectoryExist f2 >>= \d2 -> return (d1 && d2)
       let (prefix1, prefix2) = if comparingDirs then (Just f1, Just f2)
                                                 else (Nothing, Nothing)
-      let du1 = sortDuOn path (delPrefixDu prefix1 (readDu s1))
-      let du2 = sortDuOn path (delPrefixDu prefix2 (readDu s2))
+      let du1 = sortDuOn path (pruneDu prunes (delPrefixDu prefix1 (readDu s1)))
+      let du2 = sortDuOn path (pruneDu prunes (delPrefixDu prefix2 (readDu s2)))
       let r = sortDuOnMaxSize (
                flattenDu (
                 addPrefixDu prefix1 prefix2 (
