@@ -11,8 +11,8 @@ import Text.ParserCombinators.ReadP
 import Text.Printf (printf)
 
 -- The basic data structure.  Most of the time, we will use [Du], because
--- a single du run may have multiple roots.  Note that children still use
--- their full path, not relative to the parent.
+-- a single du run may have multiple roots.  The path of a child is relative
+-- to its parent.
 data Du = Du { path :: String, size :: Int, children :: [Du]}
   deriving (Show, Eq)
 
@@ -23,10 +23,10 @@ readDu s = let ls = reverse (map readDuLine (lines s))
            in  r
 
 -- Helper for readDu.  Build a hierarchical [Du] out of a flat [Du], reading
--- all entries with path under base (all entries if base is Nothing).  Input
+-- all entries with path under parent (all entries if parent is Nothing).  Input
 -- must be ordered hierarchically with parents before children--basically,
 -- the reverse of du output.  Returns the hierarchical [Du] and the
--- remaining input.  Example, if base is Just "a":
+-- remaining input.  Example, if parent is Just "a":
 --
 --  [ Du "a/b" _ [],
 --    Du "a/b/c" _ [],
@@ -40,12 +40,12 @@ readDu s = let ls = reverse (map readDuLine (lines s))
 --    [ Du "b" _, []
 --      Du "b/a" _ [] ]
 unflattenDuUnder :: Maybe String -> [Du] -> ([Du], [Du])
-unflattenDuUnder base [] = ([], [])
-unflattenDuUnder base (Du p s [] : ls) | isUnder base p =
-  let (cs, ls') = unflattenDuUnder (Just p) ls
-      (dus, ls'') = unflattenDuUnder base ls'
-  in  (Du p s cs : dus, ls'')
-unflattenDuUnder base ls = ([], ls)
+unflattenDuUnder parent [] = ([], [])
+unflattenDuUnder parent ls@(Du p s [] : ls') = case relativeTo parent p of
+  Just p' -> let (cs, ls'') = unflattenDuUnder (Just p) ls'
+                 (dus, ls''') = unflattenDuUnder parent ls''
+             in  (Du p' s cs : dus, ls''')
+  Nothing -> ([], ls)
 
 readDuLine :: String -> Du
 readDuLine l = let [(s, p)] = readP_to_S readPDuLine l
@@ -57,13 +57,15 @@ readPDuLine = do
   skipSpaces
   return s
 
-isUnder :: Maybe String -> String -> Bool
-isUnder Nothing _ = True
-isUnder (Just base) s = isUnder' base s where
-  isUnder' ""  ('/' : _) = True
-  isUnder' "/" ('/' : _) = True
-  isUnder' (c1 : cs1) (c2 : cs2) = c1 == c2 && isUnder' cs1 cs2
-  isUnder' _ _ = False
+-- Return a path relative to a parent, if it is a sub-path.  When parent is
+-- Nothing, return the path.
+relativeTo :: Maybe String -> String -> Maybe String
+relativeTo Nothing s = Just s
+relativeTo (Just parent) s = relativeTo' parent s where
+  relativeTo' ""  ('/' : s') = Just s'
+  relativeTo' "/" ('/' : s') = Just s'
+  relativeTo' (c1 : s1) (c2 : s2) | c1 == c2 = relativeTo' s1 s2
+  relativeTo' _ _ = Nothing
 
 -- Turn a hierarchical [Du] into a flat [Du].
 flattenDu :: [Du] -> [Du]
@@ -71,7 +73,12 @@ flattenDu dus = flattenDu' dus [] where
   flattenDu' :: [Du] -> ([Du] -> [Du])
   flattenDu' = foldr (\du -> (flattenDu1 du .)) id
   flattenDu1 :: Du -> ([Du] -> [Du])
-  flattenDu1 (Du p s cs) = (Du p s [] :) . flattenDu' cs
+  flattenDu1 (Du p s cs) = (Du p s [] :) . flattenDu' (map (addParent p) cs)
+
+-- Add a parent component to a path.
+addParent :: String -> Du -> Du
+addParent parent (Du p s cs) = Du (parentWithSlash ++ p) s cs where
+  parentWithSlash = if "/" `isSuffixOf` parent then parent else parent ++ "/"
 
 -- Show [Du] in unified diff format.
 showDuDiff :: String -> String -> [Du] -> String
@@ -109,7 +116,7 @@ sortDuOnMaxSize = map snd . sort' where
 -- Du must all be under this prefix.  Handles trailing '/'s in prefix.
 delPrefixDu :: Maybe String -> [Du] -> [Du]
 delPrefixDu prefix = map delDu where
-  delDu (Du p s cs) = Du (del p) s (map delDu cs)
+  delDu (Du p s cs) = Du (del p) s cs
   del = delPrefix prefix
 
 delPrefix :: Maybe String -> String -> String
@@ -123,8 +130,8 @@ delPrefix (Just prefix) = del where
 -- nothing for Nothing), where positive diffs get prefix2 and negative diffs
 -- get prefix1.  The Du must all be under ".".
 addPrefixDu :: Maybe String -> Maybe String -> [Du] -> [Du]
-addPrefixDu prefix1 prefix2 = map addDu where
-  addDu (Du p s cs) = Du (if s>0 then add2 p else add1 p) s (map addDu cs)
+addPrefixDu prefix1 prefix2 dus = map addDu dus where
+  addDu (Du p s cs) = Du (if s>0 then add2 p else add1 p) s cs
   add1 = addPrefix prefix1
   add2 = addPrefix prefix2
 
@@ -169,7 +176,7 @@ threshDu t dus = snd (threshDu' dus) where
   threshDu1 (Du p s cs) = let (rptSize, rs) = threshDu' cs
                           in  case t s rptSize of
                                 Just s' -> (Just s, [Du p s' rs])
-                                Nothing -> (rptSize, rs)
+                                Nothing -> (rptSize, map (addParent p) rs)
 
 addMaybe :: Maybe Int -> Maybe Int -> Maybe Int
 addMaybe (Just x) (Just y) = Just (x+y)
