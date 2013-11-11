@@ -73,7 +73,7 @@ flattenDu dus = flattenDu' dus [] where
   flattenDu' :: [Du] -> ([Du] -> [Du])
   flattenDu' = foldr (\du -> (flattenDu1 du .)) id
   flattenDu1 :: Du -> ([Du] -> [Du])
-  flattenDu1 (Du p s cs) = (Du p s [] :) . flattenDu' (map (addParent p) cs)
+  flattenDu1 (Du p s cs) = flattenDu' (map (addParent p) cs) . (Du p s [] :)
 
 -- Add a parent component to a path.
 addParent :: String -> Du -> Du
