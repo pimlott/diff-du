@@ -155,22 +155,21 @@ diffDu (du1@(Du p1 s1 cs1) : dus1) (du2@(Du p2 s2 cs2) : dus2) =
     EQ -> Du p1 (s2-s1) (diffDu cs1 cs2) : diffDu dus1 dus2
 
 -- Removes entries under a threshold.  The Thresher is applied to the size
--- of the entry, and the total size of its children accepted by the Thresher
+-- of the entry, and the total size of its descenents accepted by the Thresher
 -- (Nothing if none); and returns the reported size of the entry (if
 -- accepted) or Nothing (to remove).
 threshDu :: Thresher -> [Du] -> [Du]
-threshDu t dus = snd (threshDu' dus) [] where
-  -- Returns the total size accepted and the accepted [Du] (in "difference
-  -- list" [Du] -> [Du] form)
-  threshDu' :: [Du] -> (Maybe Int, [Du] -> [Du])
+threshDu t dus = snd (threshDu' dus) where
+  -- Returns the total size accepted and the accepted [Du].
+  threshDu' :: [Du] -> (Maybe Int, [Du])
   threshDu' dus = foldr (\du (s, rs) -> let (s', rs') = threshDu1 du
-                                        in  (s `addMaybe` s', rs . rs'))
-                        (Nothing, id) dus
-  threshDu1 :: Du -> (Maybe Int, [Du] -> [Du])
-  threshDu1 (Du p s cs) = let (rptSize, r) = threshDu' cs
+                                        in  (s `addMaybe` s', rs' ++ rs))
+                        (Nothing, []) dus
+  threshDu1 :: Du -> (Maybe Int, [Du])
+  threshDu1 (Du p s cs) = let (rptSize, rs) = threshDu' cs
                           in  case t s rptSize of
-                                Just s' -> (Just s, (Du p s' (r []) :))
-                                Nothing -> (rptSize, r)
+                                Just s' -> (Just s, [Du p s' rs])
+                                Nothing -> (rptSize, rs)
 
 addMaybe :: Maybe Int -> Maybe Int -> Maybe Int
 addMaybe (Just x) (Just y) = Just (x+y)
