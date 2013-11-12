@@ -79,8 +79,11 @@ Sometimes you may want to ignore diffs under certain directories.  For
 example, the objects in a `.git` directory are low-level details, and you
 probably only care about the size of the whole thing.  This is what the
 `--prune` option is for.  If you add `--prune .git` to your command line,
-`diff-du` treats `.git` directories as a unit.  Their contents count
-towards the size of `.git`, but are never displayed.
+`diff-du` treats `.git` directories as a unit.  Their contents count towards
+the size of `.git`, but are never displayed.  (This is different from the
+`--exclude` option of `du`, which does not count excluded objects at all.)
+The `--prune` option may be given multiple times.  Only exact matching of a
+single path component is currently supported.
 
 Building
 ========
