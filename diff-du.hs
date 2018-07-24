@@ -1,6 +1,6 @@
 import Data.Char (isDigit)
 import Data.Either
-import Data.List
+import Data.List hiding (sortOn)
 import System.Console.GetOpt
 import System.Directory
 import System.Environment
